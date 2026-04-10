@@ -19,11 +19,11 @@ The repository folder is structured as follows:
   - **Main **: Code (R scripts) to conduct all the analysis in the present paper
 - **Data/**: Raw data used in the paper, all in the CRS ETRS89 / UTM 31 N.  
   - **Rasters/**: All the necessary rasters for the paper, including DEM, land-use, RBIAS and combined rasters.
-    - **MDE_cat_and_100**: DEM cropped and reprojected from the GLO-30 Copernicus
+    - **MDE_cat_and_100**: DEM (.tiff) cropped and reprojected from the GLO-30 Copernicus
     (https://ec.europa.eu/eurostat/web/gisco/geodata/digital-elevation-model/copernicus#Elevation, last accessed on 9/1/2026)
   - **RAW_burials/**: Data of burials
-    - **c14_raw_burials**: Database of C14 dated burials
-    - **no_c14_raw_burials**: Database of undated burials
+    - **c14_raw_burials.xlsx**: Database of C14 dated burials (.xlsx)
+    - **no_c14_raw_burials.xlsx**: Database of undated burials (.xlsx)
     
 ## Computational Environment
 
