@@ -24,7 +24,7 @@ The repository folder is structured as follows:
   - **RAW_burials/**: Data of burials
     - **c14_raw_burials.xlsx**: Database of C14 dated burials (.xlsx)
     - **no_c14_raw_burials.xlsx**: Database of undated burials (.xlsx)
-    
+    - **sites references**: List of references of the data sets (.pdf)
 ## Computational Environment
 
 All analyses and code development were conducted on:
