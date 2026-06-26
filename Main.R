@@ -12,7 +12,7 @@
 
 # 0 ENVIRONMENT SETUP ##########################################################
 
-# 0.1 Prepare environment ======================================================
+## 0.1 Prepare environment ======================================================
 
 # Clean workspace
 rm(list = ls())
@@ -20,7 +20,7 @@ rm(list = ls())
 # Output folders (create if they do not exist)
 dir.create("Results/1_SPD", showWarnings = FALSE, recursive = TRUE)
 
-# 0.2 Install packages =========================================================
+## 0.2 Install packages =========================================================
 
 # Required packages
 packages <- c(
@@ -37,13 +37,13 @@ for (package in packages) {
   }
 }
 
-# 0.3 Show session information =================================================
+## 0.3 Show session information =================================================
 
 sessionInfo()
 
 # 1 SPD ANALYSIS ###############################################################
 
-# 1.0 Load data ================================================================
+## 1.0 Load data ================================================================
 
 # Raw radiocarbon dataset
 c14_raw <- read_excel("Data/Raw_burials/c14_raw_burials.xlsx")
@@ -67,6 +67,10 @@ utm <- st_coordinates(coords_utm)
 
 c14_raw$X <- utm[,1]
 c14_raw$Y <- utm[,2]
+
+### 1.0.1 Standard partition ===================================================
+
+### This block is the standard procedure of the paper, if holdout validation is aimed skip to 1.0.2 ###
 
 # Radiocarbon calibration
 C14_raw_calibration <- rcarbon::calibrate(
@@ -118,7 +122,85 @@ no_c14_raw <- no_c14_raw %>%
   left_join(site_counts, by = "SITE")
 
 
-# 1.1 SPD total ================================================================
+
+### 1.0.1 (Optional) Holdout validation ========================================
+
+### This section must only be run if the holdout validation is intended ###
+### To do so, instead of running 1.0.1, run this part (1.0.2) ###
+
+# HOLDOUT SPLIT: fix 25% of dated rows as "treated as undated"
+HOLDOUT_FRACTION <- 0.25
+set.seed(42)  # fixed seed guarantees the same subset every run
+
+#Subset dates 
+holdout_idx <- sample(
+  seq_len(nrow(c14_raw)),
+  size = floor(HOLDOUT_FRACTION * nrow(c14_raw)),
+  replace = FALSE
+)
+
+# Rows kept in the dated pipeline
+c14_dated   <- c14_raw[-holdout_idx, ]
+
+# Rows moved to the undated pipeline (dates are NOT used)
+c14_holdout <- c14_raw[holdout_idx, ]
+
+# Raw no radiocarbon dataset
+no_c14_raw <- read_excel("Data/Raw_burials/no_c14_raw_burials.xlsx")
+
+#Erase NAs
+no_c14_raw <- na.omit(no_c14_raw)
+
+# Ensure numeric coordinates
+no_c14_raw$LOG <- as.numeric(no_c14_raw$LOG)
+no_c14_raw$LAT <- as.numeric(no_c14_raw$LAT)
+
+# Convert to spatial object
+coords_sf <- st_as_sf(
+  no_c14_raw,
+  coords = c("LOG","LAT"),
+  crs = 4326
+)
+
+# Transform to UTM (ETRS89 / UTM zone 31N)
+coords_utm <- st_transform(coords_sf, 25831)
+no_c14_sf <- coords_utm #make a copy for latter analysis
+
+utm <- st_coordinates(coords_utm)
+
+no_c14_raw$X <- utm[,1]
+no_c14_raw$Y <- utm[,2]
+
+# Append holdout rows to the undated pool (dates ignored from here on)
+no_c14_raw <- bind_rows(no_c14_raw, c14_holdout)
+
+## Compute number of site for weight calculation
+# Combine both datasets for counting
+combined_data <- bind_rows(c14_dated, no_c14_raw)
+
+# Correction for site overrepresentation using BOTH datasets
+site_counts <- combined_data %>%
+  group_by(SITE) %>%
+  summarise(n_dates = n(), .groups = "drop")
+
+# Join counts back only
+c14_dated <- c14_dated %>%
+  left_join(site_counts, by = "SITE")
+
+no_c14_raw <- no_c14_raw %>%
+  left_join(site_counts, by = "SITE")
+
+# Keep c14_raw name for legacy compatibility 
+c14_raw <- c14_dated
+
+# Radiocarbon calibration (dated subset only)
+C14_raw_calibration <- rcarbon::calibrate(
+  x = c14_raw$DATE,
+  errors = c14_raw$SD,
+  ids = c14_raw$ID
+)
+
+## 1.1 SPD total ================================================================
 
 #Create output folder
 dir.create("Results/plots", showWarnings = FALSE)
@@ -147,7 +229,7 @@ plot(
 
 dev.off()
 
-# 1.2 SPD by variable ==========================================================
+## 1.2 SPD by variable ==========================================================
 
 # Variables to analyse
 vars <- c("OBS","SIL BEDU","AXE EX","BRACE","VAR","MOL","MONT","BQ","CH")
@@ -188,7 +270,7 @@ spd_list <- spd_list[!sapply(spd_list, is.null)]
 
 vars_valid <- names(spd_list)
 
-# 1.2.1 Export combined SPD plot =================================================
+### 1.2.1 Export combined SPD plot =================================================
 
 tiff("Results/1_SPD/spd_styles.tiff", width = 3600, height = 2400, res = 600)
 
@@ -215,7 +297,7 @@ legend(
 
 dev.off()
 
-# 1.2.2 Export individual SPD plots =============================================
+### 1.2.2 Export individual SPD plots =============================================
 
 pdf(
   "Results/1_SPD/spd_individual_styles.pdf",
@@ -276,7 +358,7 @@ for (i in 1:n) {
 
 dev.off()
 
-# 1.2.3 Extract SPD grids ========================================================
+### 1.2.3 Extract SPD grids ========================================================
 
 spd_grids <- lapply(spd_list, function(spd_obj) {
   
@@ -289,7 +371,7 @@ spd_grids <- lapply(spd_list, function(spd_obj) {
 
 names(spd_grids) <- names(spd_list)
 
-# 1.2.4 Extract metrics ==========================================================
+### 1.2.4 Extract metrics ==========================================================
 
 # Initialize list to store results
 summary_list <- list()
@@ -340,7 +422,7 @@ write.csv(summary_table, "Results/1_SPD/SPD_summary_table.csv", row.names = FALS
 
 # 2 C14 STKDE ANALYSIS #########################################################
 
-# 2.1 Create curves for Spatio-temporal KDE  ===================================
+## 2.1 Create curves for Spatio-temporal KDE  ===================================
 
 # Spatial analysis window
 ref_raster <- rast("Data/Rasters/MDE_cat_and_100.tif")
@@ -417,7 +499,7 @@ stkde_total <- function(data, win){
 
 stkde_res <- stkde_total(c14_raw, win)
 
-# 2.2. Export maps =============================================================
+## 2.2. Export maps =============================================================
 
 #Create output folder
 dir.create("Results/2_C14_STKDE/maps", showWarnings = FALSE, recursive = TRUE)
@@ -447,7 +529,7 @@ for(y in seq_along(stkde_res[["impaths"]])){
     
     # Match resolution
     if (!all(res(r_norm) == res(ref_raster))) {
-      r_norm <- resample(r_norm, ref_raster, method = "bilinear")
+      r_norm <- terra::resample(r_norm, ref_raster, method = "bilinear")
     }
     
     r_norm[is.na(r_norm)] <- 0
@@ -461,7 +543,7 @@ for(y in seq_along(stkde_res[["impaths"]])){
 
 
 # 3 STOCHASTIC STKDE SIMULATION OF UNDATED SITES ###############################
-# 3.1 Create SPD for non dated sites ===========================================
+## 3.1 Create SPD for non dated sites ===========================================
 
 # Get unique sites
 ids <- unique(no_c14_raw$ID)
@@ -521,7 +603,7 @@ for(id in ids){
   
 }
 
-# 3.2 Create Random spatial kernels for each date ==============================
+## 3.2 Create Random spatial kernels for each date ==============================
 
 # Function to convert CalSPD to CalDates
 spd_to_calDates <- function(spd_list, ids=NULL){
@@ -649,7 +731,7 @@ random_stkde <- parLapply(clus, 1:100, worker_stkde)
 
 stopCluster(clus)
 
-# 3.3 Export maps ==============================================================
+## 3.3 Export maps ==============================================================
 
 #Create output folder
 out_dir <- "Results/4_RASTERS_RNC14_STKDE"
@@ -699,7 +781,7 @@ worker_rasters <- function(y){
     }
     
     if (!all(res(r_norm) == res(ref_raster))) {
-      r_norm <- resample(r_norm, ref_raster, method = "bilinear")
+      r_norm <- terra::resample(r_norm, ref_raster, method = "bilinear")
     }
     
     r_norm[is.na(r_norm)] <- 0
@@ -720,7 +802,7 @@ parLapply(clus, seq_along(random_stkde), worker_rasters)
 
 stopCluster(clus)
 
-# 3.4 Mean of all resulting RNC14 STKDE  =======================================
+## 3.4 Mean of all resulting RNC14 STKDE  =======================================
 
 ## Mean the corrected KDEs
 #List all box folders
@@ -777,7 +859,7 @@ stopCluster(clus)
 
 # 4 CORRECTION OF C14 STKDE ####################################################
 
-# 4.1 Multiplication of C14 STKDE with RNC14STKDE  =============================
+## 4.1 Multiplication of C14 STKDE with RNC14STKDE  =============================
 
 #Output directory
 dir.create("Results/5_CORRECTED_STKDE", showWarnings = FALSE)
@@ -836,7 +918,7 @@ parLapplyLB(clus, dates, worker_corrected)
 
 stopCluster(clus)
 
-# 4.2 Mean of all resulting STKDE ==============================================
+## 4.2 Mean of all resulting STKDE ==============================================
 
 # List folders
 all_folders <- list.dirs("Results/5_CORRECTED_STKDE", recursive = FALSE)
@@ -891,7 +973,7 @@ parLapplyLB(clus, seq_along(all_folders), worker_final_mean)
 
 stopCluster(clus)
 
-# 4.3 Convert results to GIF ===================================================
+## 4.3 Convert results to GIF ===================================================
 
 ## Final model
 # Folder containing rasters
@@ -1054,7 +1136,7 @@ image_write(gif_combined, "Results/plots/Model_comparison.gif")
 
 # 5. SEQUENTIAL MODEL ANALYSIS #################################################
 
-# 5.1 Raster value extraction ==================================================
+## 5.1 Raster value extraction ==================================================
 
 #Load final models
 folder_models <- "Results/6_MEAN_CORRECTED_STKDE"
@@ -1067,14 +1149,14 @@ vals <- values(final_model_list, na.rm=TRUE)
 n_layers <- ncol(vals)
 layer_names <- names(final_model_list)
 
-# 5.2 Pearson correlation test =================================================
+## 5.2 Pearson correlation test =================================================
 
 vals_cor <- cor(vals, method = "pearson")
 
 # Save results
 write.csv(vals_cor, "Results/plots/Sequential_Pearson_Correlation.csv", row.names = TRUE)
 
-# 5.3 RMSE computation =========================================================
+## 5.3 RMSE computation =========================================================
 
 rmse_results <- matrix(NA, n_layers, n_layers, dimnames = list(layer_names, layer_names))
 pairs <- combn(n_layers, 2)
@@ -1089,7 +1171,7 @@ diag(rmse_results) <- 0  # RMSE with itself = 0
 # Save results
 write.csv(rmse_results, "Results/plots/Sequential_RMSE.csv", row.names = TRUE)
 
-# 5.4 Compute Hellinger distance and Bhattacharyya coefficient =================
+## 5.4 Compute Hellinger distance and Bhattacharyya coefficient =================
 
 # Normalize values for probability distribution 
 vals_prob <- apply(vals, 2, function(x) x / sum(x, na.rm = TRUE))
@@ -1124,7 +1206,7 @@ write.csv(bhattacharyya_results, "Results/plots/Sequential_Bhattacharyya.csv", r
 write.csv(hellinger_results, "Results/plots/Sequential_Hellinger.csv", row.names = TRUE)
 
 
-# 5.5 Sequential comparison ====================================================
+## 5.5 Sequential comparison ====================================================
 
 # Sequential values for adjacent raster layers
 seq_corr <- diag(vals_cor[-1, -ncol(vals_cor)])
@@ -1227,7 +1309,7 @@ combined_plot <- ggplot(combined_df, aes(x = x)) +
 ggsave("Results/plots/Sequential_All_Metrics.tiff", combined_plot, width = 10, height = 6)
 
 
-# 5.6 Difference maps ==========================================================
+## 5.6 Difference maps ==========================================================
 
 #Create output folder
 dir.create(file.path("Results/7_DIFFERENCE_MEAN_STKDE"))
@@ -1252,7 +1334,7 @@ writeRaster(
 
 # 6. STKDE BY VARIABLE #########################################################
 
-# 6.1 Creation of STKDE of all variables =======================================
+## 6.1 Creation of STKDE of all variables =======================================
 
 #Output directory
 dir.create(file.path("Results/8_VARIABLES_STKDE"))
@@ -1372,7 +1454,7 @@ for(y in seq(6400, 5000, -100)){
 
 }
 
-# 6.2 Comparison with Final STKDE ==============================================
+## 6.2 Comparison with Final STKDE ==============================================
 
 dir.create(file.path("Results/9_DIFFERENCE_VAR_STKDE"), showWarnings = FALSE, recursive = TRUE)
 
@@ -1449,7 +1531,7 @@ for (v in names(stkde_list)) {
             row.names = FALSE)
 }
 
-# 6.2.1 Plot metrics ===========================================================
+### 6.2.1 Plot metrics ===========================================================
 
 #Create a folder to store results
 out_dir <- "Results/9_DIFFERENCE_VAR_STKDE/plots"
@@ -1510,7 +1592,7 @@ for (v in names(stkde_list)) {
   )
 }
 
-# 6.3 Plot the comparison graphics =============================================
+## 6.3 Plot the comparison graphics =============================================
 
 #Set up out_dir again
 out_dir <- "Results/9_DIFFERENCE_VAR_STKDE/plots"
@@ -1588,7 +1670,7 @@ for (y in names(final_model_list)) {
 
 # 7. FINAL MODEL CONTRUCTION  ##################################################
 
-# 7.1 Probabilistic chronological assignment of undated sites  ==================
+## 7.1 Probabilistic chronological assignment of undated sites  ==================
 
 #Load final models
 folder_models <- "Results/6_MEAN_CORRECTED_STKDE"
@@ -1640,7 +1722,7 @@ no_c14_sf_final <- no_c14_sf %>%
   mutate(ID = row_number()) %>%
   left_join(binary_df, by = "ID")
 
-# 7.2 Assignment of C14-dated sites ============================================
+## 7.2 Assignment of C14-dated sites ============================================
 
 # Convert raw C14 dates to integer vector
 ages <- as.integer(c14_raw$DATE)
@@ -1724,7 +1806,7 @@ presence_matrix$ID <- rownames(presence_matrix)
 # Merge presence_matrix into c14_sf
 c14_sf <- merge(c14_sf, presence_matrix, by = "ID", all.x = TRUE)
 
-# 7.3 Construct and plot final models ==========================================
+## 7.3 Construct and plot final models ==========================================
 
 #crate a folder to store
 dir.create("Results/10_FINAL_MODELS")
@@ -1802,7 +1884,7 @@ gif <- image_animate(image_join(img_list), fps = 0.5)
 # Save GIF
 image_write(gif, "Results/10_FINAL_MODELS/Final_model.gif")
 
-# 7.4 Summary graphic ==========================================================
+## 7.4 Summary graphic ==========================================================
 
 ## Graph
 # Convert to long format
