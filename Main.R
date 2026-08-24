@@ -123,7 +123,7 @@ no_c14_raw <- no_c14_raw %>%
 
 
 
-### 1.0.1 (Optional) Holdout validation ========================================
+### 1.0.2 (Optional) Holdout validation ========================================
 
 ### This section must only be run if the holdout validation is intended ###
 ### To do so, instead of running 1.0.1, run this part (1.0.2) ###
