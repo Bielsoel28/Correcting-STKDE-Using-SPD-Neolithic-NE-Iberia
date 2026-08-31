@@ -6,7 +6,7 @@
 #                                                                       #                                                   
 # Author: Biel Soriano Elias & Andreu Monforte-Barberan                 #
 # Affiliation : Autonomous University of Barcelona                      #
-# Creation date : XX/XX/XXXX                                            #
+# Creation date : 31/08/2026                                            #
 # E-mail: biel.soriano@uab.cat & andreumonbar@gmail.com                 #
 ##########################################################################
 
