@@ -16,7 +16,7 @@ The repository folder is structured as follows:
 
 - **README.md**: This file (repository overview).  
 - **Code/**: Contains all R scripts for the paper.  
-  - **Main **: Code (R scripts) to conduct all the analysis in the present paper
+  - **Main**: Code (R scripts) to conduct all the analysis in the present paper
 - **Data/**: Raw data used in the paper, all in the CRS ETRS89 / UTM 31 N.  
   - **Rasters/**: All the necessary rasters for the paper.
     - **MDE_cat_and_100**: DEM (.tiff) cropped and reprojected from the EU-DEM
